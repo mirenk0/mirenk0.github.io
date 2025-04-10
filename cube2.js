@@ -1,4 +1,3 @@
-
 // 3D Cube Navigation System
 // Handles cube rendering, interaction, and navigation
 
@@ -87,7 +86,7 @@ function addClickableLabels() {
     
     pages.forEach((page, index) => {
         const labelGeometry = new THREE.PlaneGeometry(0.8, 0.3);
-        const labelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+        const labelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
         const label = new THREE.Mesh(labelGeometry, labelMaterial);
         label.position.set(...labelPositions[index].position);
         label.rotation.set(...labelPositions[index].rotation);
@@ -105,21 +104,53 @@ function onWindowResize() {
 
 function setupMouseControls() {
     const container = document.getElementById('cube-container');
-    container.addEventListener('mousedown', (event) => {
+    let previousPosition = null;
+
+    function handleStart(event) {
         isDragging = true;
-        previousMousePosition = { x: event.clientX, y: event.clientY };
-    });
-    window.addEventListener('mousemove', (event) => {
+        let position;
+        if (event.touches) {
+            position = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        } else {
+            position = { x: event.clientX, y: event.clientY };
+        }
+        previousPosition = position;
+    }
+
+    function handleMove(event) {
         if (isDragging) {
-            const deltaMove = { x: event.clientX - previousMousePosition.x, y: event.clientY - previousMousePosition.y };
+            let position;
+            if (event.touches) {
+                position = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+            } else {
+                position = { x: event.clientX, y: event.clientY };
+            }
+            const deltaMove = { x: position.x - previousPosition.x, y: position.y - previousPosition.y };
             rotationSpeed.x = -deltaMove.y * 0.003;
             rotationSpeed.y = -deltaMove.x * 0.003;
             cube.rotation.x += rotationSpeed.x;
             cube.rotation.y += rotationSpeed.y;
-            previousMousePosition = { x: event.clientX, y: event.clientY };
+            previousPosition = position;
+
+            // Prevent scrolling during touch interaction
+            if (event.touches) {
+                event.preventDefault(); // Prevent scrolling
+            }
         }
-    });
-    window.addEventListener('mouseup', () => isDragging = false);
+    }
+
+    function handleEnd() {
+        isDragging = false;
+    }
+
+    container.addEventListener('mousedown', handleStart);
+    container.addEventListener('touchstart', handleStart, { passive: false }); // Mark listener as non-passive
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: false }); // Mark listener as non-passive
+
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchend', handleEnd);
 }
 
 function setupRaycaster() {

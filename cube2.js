@@ -17,7 +17,13 @@ function initCube() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('cube-container').appendChild(renderer.domElement);
 
-    const geometry = new THREE.BoxGeometry(2, 2, 2, 50, 50, 50);
+    let cubeSize = 2;  // Default cube size
+    if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
+        cubeSize = 1.0;  // Smaller size for mobile
+        camera.position.z = 2.0; // Bring camera closer
+    }
+
+    const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize, 50, 50, 50);
 
     const material = createCubeMaterials(); // Get shader material
     cube = new THREE.Mesh(geometry, material);
@@ -25,7 +31,7 @@ function initCube() {
     const light = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(light);
     scene.add(cube);
-    addClickableLabels();
+    addClickableLabels(cubeSize); // Pass cube size to labels
     setupMouseControls();
     setupRaycaster();
     animate();
@@ -67,22 +73,28 @@ function createRoundedRectTexture(text) {
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
 }
-function addClickableLabels() {
-    clickableLabels.forEach(label => scene.remove(label));
+
+function addClickableLabels(cubeSize) {
+    // Remove existing labels properly
+    clickableLabels.forEach(label => {
+        cube.remove(label);
+        label.geometry.dispose();
+        label.material.dispose();
+    });
     clickableLabels = [];
 
     const labelPositions = [
-        { position: [1.01, 0, 0], rotation: [0, Math.PI / 2, 0] },
-        { position: [-1.01, 0, 0], rotation: [0, -Math.PI / 2, 0] },
-        { position: [0, 1.01, 0], rotation: [-Math.PI / 2, 0, 0] },
-        { position: [0, -1.01, 0], rotation: [Math.PI / 2, 0, 0] },
-        { position: [0, 0, 1.01], rotation: [0, 0, 0] },
-        { position: [0, 0, -1.01], rotation: [0, Math.PI, 0] }
+        { position: [cubeSize/2 + 0.01, 0, 0], rotation: [0, Math.PI / 2, 0] },
+        { position: [-cubeSize/2 - 0.01, 0, 0], rotation: [0, -Math.PI / 2, 0] },
+        { position: [0, cubeSize/2 + 0.01, 0], rotation: [-Math.PI / 2, 0, 0] },
+        { position: [0, -cubeSize/2 - 0.01, 0], rotation: [Math.PI / 2, 0, 0] },
+        { position: [0, 0, cubeSize/2 + 0.01], rotation: [0, 0, 0] },
+        { position: [0, 0, -cubeSize/2 - 0.01], rotation: [0, Math.PI, 0] }
     ];
 
     pages.forEach((page, index) => {
         const labelTexture = createRoundedRectTexture(pageNames[index]);
-        const labelGeometry = new THREE.PlaneGeometry(1, 0.5); // Adjust size as needed
+        const labelGeometry = new THREE.PlaneGeometry(cubeSize / 2, cubeSize / 4); // Adjust size as needed
         const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true });
         const label = new THREE.Mesh(labelGeometry, labelMaterial);
         label.position.set(...labelPositions[index].position);
@@ -136,10 +148,32 @@ function createCubeMaterials() {
 
     return material;
 }
+
 function onWindowResize() {
+    let cubeSize = 2;  // Default cube size
+    if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
+        cubeSize = 1.0;  // Smaller size for mobile
+        camera.position.z = 2.0; // Bring camera closer
+    } else {
+        cubeSize = 2;
+        camera.position.z = 4.0;
+    }
+
+    // Dispose of the old geometry
+    cube.geometry.dispose();
+
+    // Create a new geometry
+    const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize, 50, 50, 50);
+    cube.geometry = geometry;
+
+    // Recreate the labels
+    addClickableLabels(cubeSize);
+
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+
+
 }
 
 function setupMouseControls() {

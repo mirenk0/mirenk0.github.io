@@ -19,7 +19,7 @@ function initCube() {
 
     let cubeSize = 2;  // Default cube size
     if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
-        cubeSize = 1.0;  // Smaller size for mobile
+        cubeSize = 0.69;  // Smaller size for mobile
         camera.position.z = 2.0; // Bring camera closer
     }
 

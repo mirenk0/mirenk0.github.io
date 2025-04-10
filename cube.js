@@ -1,314 +1,282 @@
-// 3D Cube with Three.js
+// Handles cube rendering, interaction, and navigation
+
 let scene, camera, renderer, cube;
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let rotationSpeed = { x: 0, y: 0 };
+let rotationSpeed = { x: 0.005, y: 0.005 }; // Initial rotation speed
 const pages = ['about', 'projects', 'blog', 'contact', 'resources', 'downloads'];
 const pageNames = ['About', 'Projects', 'Blog', 'Contact', 'Resources', 'Downloads'];
+let clickableLabels = [];
 
-// DOM pill buttons that will be positioned over the cube faces for clicking
-const pillButtons = [];
-
-function init3DCube() {
+function initCube() {
     scene = new THREE.Scene();
-    
-    // Camera setup with adjusted position for better perspective
-    camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 4.5; // Made cube smaller by moving camera back
-    camera.position.y = -0.5;
-    
-    // Renderer setup
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 4;
+
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 0);
     document.getElementById('cube-container').appendChild(renderer.domElement);
-    
-    // Create cube
-    const geometry = new THREE.BoxGeometry(2.5, 2.5, 2.5); // Make cube smaller
-    
-    // Use shader materials for smooth gradients across edges
-    const materials = [];
-    
-    // Define gradient colors for each face
-    const gradients = [
-        ['#ff00ff', '#ffff00'], // Right: Magenta to Yellow
-        ['#0000ff', '#ff00ff'], // Left: Blue to Magenta
-        ['#00ffff', '#0000ff'], // Top: Cyan to Blue
-        ['#ff0000', '#ff00ff'], // Bottom: Red to Magenta
-        ['#ff0000', '#ffff00'], // Front: Red to Yellow
-        ['#0000ff', '#00ffff']  // Back: Blue to Cyan
-    ];
-    
-    // Create shader material for smooth gradients
-    for (let i = 0; i < 6; i++) {
-        const vertexShader = `
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `;
-        
-        const fragmentShader = `
-            uniform vec3 color1;
-            uniform vec3 color2;
-            varying vec2 vUv;
-            
-            void main() {
-                gl_FragColor = vec4(mix(color1, color2, vUv.x + vUv.y), 0.9);
-            }
-        `;
-        
-        const uniforms = {
-            color1: { value: new THREE.Color(gradients[i][0]) },
-            color2: { value: new THREE.Color(gradients[i][1]) }
-        };
-        
-        materials.push(new THREE.ShaderMaterial({
-            uniforms: uniforms,
-            vertexShader: vertexShader,
-            fragmentShader: fragmentShader,
-            transparent: true
-        }));
+
+    let cubeSize = 2;  // Default cube size
+    if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
+        cubeSize = 0.69;  // Smaller size for mobile
+
+        if (window.innerWidth <= 414) {  // iPhone sizes
+            cubeSize = 0.65;  // Even smaller for iPhones
+        }
+
+        camera.position.z = 2.0; // Bring camera closer
     }
-    
-    cube = new THREE.Mesh(geometry, materials);
+
+    const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize, 50, 50, 50);
+
+    const material = createCubeMaterials(); // Get shader material
+    cube = new THREE.Mesh(geometry, material);
+
+    const light = new THREE.AmbientLight(0xffffff, 1.5);
+    scene.add(light);
     scene.add(cube);
-    
-    // Create HTML pill buttons for better interactivity
-    createPillButtons();
-    
-    // Add mouse controls for rotation
+    addClickableLabels(cubeSize); // Pass cube size to labels
     setupMouseControls();
-    
-    // Animation loop
+    setupRaycaster();
     animate();
-    
-    // Handle window resize
     window.addEventListener('resize', onWindowResize);
 }
+function createRoundedRectTexture(text, cubeSize) {
+    const canvas = document.createElement('canvas');
+    const canvasSize = 512; // Base canvas size
+    canvas.width = canvasSize;
+    canvas.height = canvasSize / 2; // Keep aspect ratio
 
-function createPillButtons() {
-    // Remove any existing buttons
-    pillButtons.forEach(button => {
-        if (button.parentNode) {
-            button.parentNode.removeChild(button);
-        }
-    });
-    pillButtons.length = 0;
-    
-    // Create new buttons
-    for (let i = 0; i < pageNames.length; i++) {
-        const button = document.createElement('div');
-        button.className = 'pill-button';
-        button.textContent = pageNames[i];
-        button.dataset.page = pages[i];
-        button.style.display = 'none'; // Hidden by default
-        
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showPage(e.currentTarget.dataset.page);
-        });
-        
-        document.body.appendChild(button);
-        pillButtons.push(button);
-    }
+    const ctx = canvas.getContext('2d');
+
+    const cornerRadius = 50; // Adjust for more or less rounded corners
+    const x = 0;
+    const y = 0;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.beginPath();
+    ctx.moveTo(x + cornerRadius, y);
+    ctx.lineTo(x + width - cornerRadius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + cornerRadius);
+    ctx.lineTo(x + width, y + height - cornerRadius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - cornerRadius, y + height);
+    ctx.lineTo(x + cornerRadius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - cornerRadius);
+    ctx.lineTo(x, y + cornerRadius);
+    ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+    ctx.closePath();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Semi-transparent white
+    ctx.fill();
+
+    const fontSize = 46 * cubeSize;
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.fillStyle = 'black';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
 }
 
-function updatePillButtonPositions() {
-    // Get the cube's world position
-    cube.updateMatrixWorld();
-    
-    // Define positions for each face (centers of each face)
-    const facePositions = [
-        new THREE.Vector3(1.25, 0, 0),  // Right
-        new THREE.Vector3(-1.25, 0, 0), // Left
-        new THREE.Vector3(0, 1.25, 0),  // Top
-        new THREE.Vector3(0, -1.25, 0), // Bottom
-        new THREE.Vector3(0, 0, 1.25),  // Front
-        new THREE.Vector3(0, 0, -1.25)  // Back
+function addClickableLabels(cubeSize) {
+    // Remove existing labels properly
+    clickableLabels.forEach(label => {
+        cube.remove(label);
+        label.geometry.dispose();
+        label.material.dispose();
+    });
+    clickableLabels = [];
+
+    const labelPositions = [
+        { position: [cubeSize/2 + 0.01, 0, 0], rotation: [0, Math.PI / 2, 0] },
+        { position: [-cubeSize/2 - 0.01, 0, 0], rotation: [0, -Math.PI / 2, 0] },
+        { position: [0, cubeSize/2 + 0.01, 0], rotation: [-Math.PI / 2, 0, 0] },
+        { position: [0, -cubeSize/2 - 0.01, 0], rotation: [Math.PI / 2, 0, 0] },
+        { position: [0, 0, cubeSize/2 + 0.01], rotation: [0, 0, 0] },
+        { position: [0, 0, -cubeSize/2 - 0.01], rotation: [0, Math.PI, 0] }
     ];
-    
-    // Calculate normal vectors for each face to check visibility
-    const normals = [
-        new THREE.Vector3(1, 0, 0),   // Right
-        new THREE.Vector3(-1, 0, 0),  // Left
-        new THREE.Vector3(0, 1, 0),   // Top
-        new THREE.Vector3(0, -1, 0),  // Bottom
-        new THREE.Vector3(0, 0, 1),   // Front
-        new THREE.Vector3(0, 0, -1)   // Back
-    ];
-    
-    // For each face, project its position to screen coordinates
-    facePositions.forEach((pos, index) => {
-        // Apply cube's transformation to the face position
-        const worldPos = pos.clone().applyMatrix4(cube.matrixWorld);
-        
-        // Calculate if this face is visible (facing the camera)
-        const normal = normals[index].clone().applyQuaternion(cube.quaternion);
-        const cameraDirection = new THREE.Vector3().subVectors(camera.position, worldPos).normalize();
-        const dotProduct = normal.dot(cameraDirection);
-        
-        // Project the world position to screen coordinates
-        const screenPos = worldPos.project(camera);
-        
-        // Convert to actual screen coordinates
-        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-        
-        // Update button position
-        if (dotProduct > 0.2) { // Face is somewhat visible
-            pillButtons[index].style.display = 'block';
-            pillButtons[index].style.left = `${x - 50}px`; // Adjust for button width
-            pillButtons[index].style.top = `${y - 20}px`;  // Adjust for button height
-            
-            // Make buttons facing more toward camera more opaque
-            const opacity = Math.min(1, dotProduct * 2);
-            pillButtons[index].style.opacity = opacity;
-            
-            // Calculate the rotation of the button to match face orientation
-            const rotationX = Math.atan2(normal.y, normal.z);
-            const rotationY = Math.atan2(normal.x, normal.z);
-            pillButtons[index].style.transform = `perspective(500px) rotateX(${rotationX}rad) rotateY(${rotationY}rad)`;
-            
-            // Adjust z-index so buttons on faces closer to camera appear on top
-            const distance = camera.position.distanceTo(worldPos);
-            const zIndex = Math.round(1000 - distance * 100);
-            pillButtons[index].style.zIndex = zIndex;
-        } else {
-            // Hide buttons on back faces
-            pillButtons[index].style.display = 'none';
+
+    pages.forEach((page, index) => {
+        const labelTexture = createRoundedRectTexture(pageNames[index], cubeSize);
+        const labelGeometry = new THREE.PlaneGeometry(cubeSize / 2, cubeSize / 4); // Adjust size as needed
+        const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true });
+        const label = new THREE.Mesh(labelGeometry, labelMaterial);
+        label.position.set(...labelPositions[index].position);
+        label.rotation.set(...labelPositions[index].rotation);
+        label.userData = { page };
+        cube.add(label);
+        clickableLabels.push(label);
+    });
+}
+function createCubeMaterials() {
+    const vertexShader = `
+        varying vec3 vPosition;
+        void main() {
+            vPosition = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
+    `;
+
+    const fragmentShader = `
+        varying vec3 vPosition;
+
+        // Function to create a smooth gradient
+        vec3 gradient(vec3 pos) {
+            // Normalize the position to the range [0, 1]
+            vec3 normalizedPos = (pos + vec3(1.0)) / 2.0;
+
+            // Define the colors for the gradient
+            vec3 color1 = vec3(1.0, 0.0, 0.0); // Red
+            vec3 color2 = vec3(0.0, 1.0, 0.0); // Green
+            vec3 color3 = vec3(0.0, 0.0, 1.0); // Blue
+
+            // Interpolate between the colors based on the position
+            vec3 color = mix(color1, color2, normalizedPos.x);
+            color = mix(color, color3, normalizedPos.y);
+
+            return color;
+        }
+
+        void main() {
+            // Calculate the color based on the vertex position
+            vec3 color = gradient(vPosition);
+
+            gl_FragColor = vec4(color, 1.0);
+        }
+    `;
+
+    const material = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader
+    });
+
+    return material;
+}
+
+function onWindowResize() {
+    let cubeSize = 2;  // Default cube size
+    if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
+        cubeSize = 1.0;  // Smaller size for mobile
+
+        if (window.innerWidth <= 414) {  // iPhone sizes
+            cubeSize = 0.65;  // Even smaller for iPhones
+        }
+
+        camera.position.z = 2.0; // Bring camera closer
+    } else {
+        cubeSize = 2;
+        camera.position.z = 4.0;
+    }
+
+    // Dispose of the old geometry
+    cube.geometry.dispose();
+
+    // Create a new geometry
+    const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize, 50, 50, 50);
+    cube.geometry = geometry;
+
+    // Recreate the labels
+    addClickableLabels(cubeSize);
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+
+}
+
+function setupMouseControls() {
+    const container = document.getElementById('cube-container');
+    let previousPosition = null;
+
+    function handleStart(event) {
+        isDragging = true;
+        let position;
+        if (event.touches) {
+            position = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        } else {
+            position = { x: event.clientX, y: event.clientY };
+        }
+        previousPosition = position;
+    }
+
+    function handleMove(event) {
+        if (isDragging) {
+            let position;
+            if (event.touches) {
+                position = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+            } else {
+                position = { x: event.clientX, y: event.clientY };
+            }
+            const deltaMove = { x: position.x - previousPosition.x, y: position.y - previousPosition.y };
+            rotationSpeed.x = -deltaMove.y * 0.003;
+            rotationSpeed.y = -deltaMove.x * 0.003;
+            cube.rotation.x += rotationSpeed.x;
+            cube.rotation.y += rotationSpeed.y;
+            previousPosition = position;
+
+            // Prevent scrolling during touch interaction
+            if (event.touches) {
+                event.preventDefault(); // Prevent scrolling
+            }
+        }
+    }
+
+    function handleEnd() {
+        isDragging = false;
+    }
+
+    container.addEventListener('mousedown', handleStart);
+    container.addEventListener('touchstart', handleStart, { passive: false }); // Mark listener as non-passive
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: false }); // Mark listener as non-passive
+
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchend', handleEnd);
+}
+
+function setupRaycaster() {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    window.addEventListener('click', (event) => {
+        if (isDragging) return;
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(clickableLabels);
+        if (intersects.length > 0) showPage(intersects[0].object.userData.page);
     });
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    
-    // Apply damping to the rotation when not dragging
-    if (!isDragging) {
-        rotationSpeed.x *= 0.95;
-        rotationSpeed.y *= 0.95;
-        
-        cube.rotation.x += rotationSpeed.x;
-        cube.rotation.y += rotationSpeed.y;
-    }
-    
-    // Update pill button positions
-    updatePillButtonPositions();
-    
+    cube.rotation.x += rotationSpeed.x; // Apply continuous rotation
+    cube.rotation.y += rotationSpeed.y;
+
     renderer.render(scene, camera);
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function setupMouseControls() {
-    const container = renderer.domElement;
-    
-    container.addEventListener('mousedown', (event) => {
-        // Only start dragging if we click on the cube, not on a button
-        if (event.target === container) {
-            isDragging = true;
-            previousMousePosition = {
-                x: event.clientX,
-                y: event.clientY
-            };
-            event.preventDefault();
-        }
-    });
-    
-    window.addEventListener('mousemove', (event) => {
-        if (isDragging) {
-            const deltaMove = {
-                x: event.clientX - previousMousePosition.x,
-                y: event.clientY - previousMousePosition.y
-            };
-            
-            // Fixed rotation direction to be more intuitive
-            rotationSpeed.y = deltaMove.x * 0.003;
-            rotationSpeed.x = deltaMove.y * 0.003;
-            
-            cube.rotation.y += rotationSpeed.y;
-            cube.rotation.x += rotationSpeed.x;
-            
-            previousMousePosition = {
-                x: event.clientX,
-                y: event.clientY
-            };
-        }
-    });
-    
-    window.addEventListener('mouseup', () => {
-        isDragging = false;
-    });
-    
-    // For touch devices
-    container.addEventListener('touchstart', (event) => {
-        if (event.touches.length === 1) {
-            isDragging = true;
-            previousMousePosition = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY
-            };
-        }
-    });
-    
-    window.addEventListener('touchmove', (event) => {
-        if (isDragging && event.touches.length === 1) {
-            const deltaMove = {
-                x: event.touches[0].clientX - previousMousePosition.x,
-                y: event.touches[0].clientY - previousMousePosition.y
-            };
-            
-            rotationSpeed.y = deltaMove.x * 0.003;
-            rotationSpeed.x = deltaMove.y * 0.003;
-            
-            cube.rotation.y += rotationSpeed.y;
-            cube.rotation.x += rotationSpeed.x;
-            
-            previousMousePosition = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY
-            };
-        }
-    });
-    
-    window.addEventListener('touchend', () => {
-        isDragging = false;
-    });
-}
-
 function showPage(pageId) {
-    const contentContainer = document.getElementById('content-container');
-    contentContainer.style.display = 'block';
-    
-    // Hide all sections first
-    const sections = document.querySelectorAll('.content-section');
-    sections.forEach(section => {
-        section.style.display = 'none';
-    });
-    
-    // Show selected section
+    document.getElementById('content-container').style.display = 'block';
+    document.querySelectorAll('.content-section').forEach(section => section.style.display = 'none');
     document.getElementById(pageId).style.display = 'block';
-    
-    // Hide cube container
     document.getElementById('cube-container').style.display = 'none';
-    
-    // Hide pill buttons
-    pillButtons.forEach(button => {
-        button.style.display = 'none';
+}
+
+function setupBackButton() {
+    document.getElementById('back-button').addEventListener('click', () => {
+        document.getElementById('content-container').style.display = 'none';
+        document.getElementById('cube-container').style.display = 'block';
     });
 }
 
-// Setup back button
-document.getElementById('back-button').addEventListener('click', () => {
-    document.getElementById('content-container').style.display = 'none';
-    document.getElementById('cube-container').style.display = 'block';
+window.addEventListener('load', () => {
+    initCube();
+    setupBackButton();
 });
 
-// Initialize 3D cube
-window.addEventListener('DOMContentLoaded', init3DCube);

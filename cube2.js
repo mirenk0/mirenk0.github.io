@@ -3,7 +3,7 @@
 let scene, camera, renderer, cube;
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let rotationSpeed = { x: 0, y: 0 };
+let rotationSpeed = { x: 0.005, y: 0.005 }; // Initial rotation speed
 const pages = ['about', 'projects', 'blog', 'contact', 'resources', 'downloads'];
 const pageNames = ['About', 'Projects', 'Blog', 'Contact', 'Resources', 'Downloads'];
 let clickableLabels = [];
@@ -20,6 +20,11 @@ function initCube() {
     let cubeSize = 2;  // Default cube size
     if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
         cubeSize = 0.69;  // Smaller size for mobile
+
+        if (window.innerWidth <= 414) {  // iPhone sizes
+            cubeSize = 0.65;  // Even smaller for iPhones
+        }
+
         camera.position.z = 2.0; // Bring camera closer
     }
 
@@ -37,10 +42,12 @@ function initCube() {
     animate();
     window.addEventListener('resize', onWindowResize);
 }
-function createRoundedRectTexture(text) {
+function createRoundedRectTexture(text, cubeSize) {
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256; // Adjust height as needed
+    const canvasSize = 512; // Base canvas size
+    canvas.width = canvasSize;
+    canvas.height = canvasSize / 2; // Keep aspect ratio
+
     const ctx = canvas.getContext('2d');
 
     const cornerRadius = 50; // Adjust for more or less rounded corners
@@ -64,7 +71,8 @@ function createRoundedRectTexture(text) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Semi-transparent white
     ctx.fill();
 
-    ctx.font = 'bold 60px Arial';
+    const fontSize = 46 * cubeSize;
+    ctx.font = `bold ${fontSize}px Arial`;
     ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -93,7 +101,7 @@ function addClickableLabels(cubeSize) {
     ];
 
     pages.forEach((page, index) => {
-        const labelTexture = createRoundedRectTexture(pageNames[index]);
+        const labelTexture = createRoundedRectTexture(pageNames[index], cubeSize);
         const labelGeometry = new THREE.PlaneGeometry(cubeSize / 2, cubeSize / 4); // Adjust size as needed
         const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true });
         const label = new THREE.Mesh(labelGeometry, labelMaterial);
@@ -153,6 +161,11 @@ function onWindowResize() {
     let cubeSize = 2;  // Default cube size
     if (window.innerWidth <= 768) {  // Adjust this breakpoint as needed
         cubeSize = 1.0;  // Smaller size for mobile
+
+        if (window.innerWidth <= 414) {  // iPhone sizes
+            cubeSize = 0.65;  // Even smaller for iPhones
+        }
+
         camera.position.z = 2.0; // Bring camera closer
     } else {
         cubeSize = 2;
@@ -242,12 +255,9 @@ function setupRaycaster() {
 
 function animate() {
     requestAnimationFrame(animate);
-    if (!isDragging) {
-        rotationSpeed.x *= 0.95;
-        rotationSpeed.y *= 0.95;
-        cube.rotation.x += rotationSpeed.x;
-        cube.rotation.y += rotationSpeed.y;
-    }
+    cube.rotation.x += rotationSpeed.x; // Apply continuous rotation
+    cube.rotation.y += rotationSpeed.y;
+
     renderer.render(scene, camera);
 }
 

@@ -34,7 +34,7 @@ body, html {
     position: fixed;
     top: 20px;
     left: 20px;
-    background-color: #32ab61;
+    background-color: #40e06e;
     color: #000;
     border: none;
     padding: 10px 15px;
@@ -53,7 +53,7 @@ body, html {
 }
 
 h1, h2 {
-    color: #32ab61;
+    color: #40e06e;
 }
 
 a {

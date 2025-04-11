@@ -112,6 +112,7 @@ function addClickableLabels(cubeSize) {
         clickableLabels.push(label);
     });
 }
+
 function createCubeMaterials() {
     const vertexShader = `
         varying vec3 vPosition;

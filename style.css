@@ -30,6 +30,7 @@ body, html {
   height: 150em;
   flex-wrap: wrap;
 }
+
 #creature div {
   transform-style: preserve-3d;
   position: relative;
@@ -58,7 +59,7 @@ body, html {
     position: absolute;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: #070b0a /*rgba(0, 0, 0, 0.8) */;
     z-index: 20;
     overflow: auto;
     padding: 20px;
@@ -70,7 +71,7 @@ body, html {
     position: fixed;
     top: 20px;
     left: 20px;
-    background-color: #33ff33;
+    background-color: #32ab61  /* #33ff33 */;
     color: #000;
     border: none;
     padding: 10px 15px;
